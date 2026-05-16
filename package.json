@@ -1,0 +1,30 @@
+{
+  "name": "PlaySoundMobile",
+  "author": "MakeAwesomeHappen",
+  "version": "1.0.0",
+  "keywords": ["pebble-app"],
+  "private": true,
+  "dependencies": {},
+  "pebble": {
+    "displayName": "PlaySoundMobile",
+    "uuid": "91006f35-ed44-4318-adab-f459a0d81768",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "flint"
+    ],
+    "watchapp": {
+      "watchface": false
+    },
+    "messageKeys": [
+      "PLAY_SOUND",
+      "STOP_SOUND",
+      "PLAY_ERROR",
+      "PLAY_SUCCESS",
+      "VOLUME_SET_MAX"
+    ],
+    "resources": {
+      "media": []
+    }
+  }
+}

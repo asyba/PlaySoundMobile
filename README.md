@@ -1,6 +1,10 @@
 # PlaySoundMobile
 
-Pebble watchapp that plays sounds on a paired iPhone. Select a sound type from the menu, and the C side tells PebbleKit JS to call `Pebble.playSound()` on iOS.
+Proof of concept for a **Find my Phone** feature on iOS using a Pebble watch. iOS is notoriously locked down — this explores whether `Pebble.playSound()` can be leveraged to trigger audible alerts from the watch despite Apple's limitations.
+
+Select a sound type from the menu, and the C side tells PebbleKit JS to call `Pebble.playSound()` on iOS.
+
+> **Requires:** the companion mobile app running on the paired iPhone — [coredevices/mobileapp](https://github.com/coredevices/mobileapp)
 
 ## Features
 

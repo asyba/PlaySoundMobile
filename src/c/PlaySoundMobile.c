@@ -13,6 +13,12 @@ static void (*s_volume_done_cb)(void) = NULL;
 static AppTimer *s_alt_loop_timer = NULL;
 static bool s_alt_loop_toggle = false;
 
+// --- One-click action globals ---
+static Window *s_oneclick_window;
+static TextLayer *s_status_layer;
+static TextLayer *s_hint_layer;
+static bool s_is_playing;
+
 // --- Volume max logic ---
 
 static void volume_up_timer_callback(void *context) {
@@ -249,19 +255,103 @@ static void prv_window_unload(Window *window) {
   simple_menu_layer_destroy(s_simple_menu_layer);
 }
 
+// --- One-click action ---
+
+static void prv_oneclick_select_click(ClickRecognizerRef recognizer, void *context) {
+  if (s_is_playing) {
+    DictionaryIterator *iter;
+    app_message_outbox_begin(&iter);
+    dict_write_uint8(iter, MESSAGE_KEY_STOP_SOUND, 1);
+    app_message_outbox_send();
+    text_layer_set_text(s_status_layer, "Stopped");
+    s_is_playing = false;
+  } else {
+    DictionaryIterator *iter;
+    app_message_outbox_begin(&iter);
+    dict_write_cstring(iter, MESSAGE_KEY_PLAY_SOUND, "alarm_loop");
+    app_message_outbox_send();
+    text_layer_set_text(s_status_layer, "Playing...");
+    s_is_playing = true;
+  }
+}
+
+static void prv_oneclick_back_click(ClickRecognizerRef recognizer, void *context) {
+  window_stack_pop(true);
+}
+
+static void prv_oneclick_click_config_provider(void *context) {
+  window_single_click_subscribe(BUTTON_ID_SELECT, prv_oneclick_select_click);
+  window_single_click_subscribe(BUTTON_ID_BACK, prv_oneclick_back_click);
+}
+
+static void prv_oneclick_load(Window *window) {
+  Layer *window_layer = window_get_root_layer(window);
+  GRect bounds = layer_get_bounds(window_layer);
+
+  s_status_layer = text_layer_create(GRect(0, bounds.size.h / 2 - 30, bounds.size.w, 60));
+  text_layer_set_text(s_status_layer, "Playing...");
+  text_layer_set_text_alignment(s_status_layer, GTextAlignmentCenter);
+  text_layer_set_font(s_status_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
+  layer_add_child(window_layer, text_layer_get_layer(s_status_layer));
+
+  s_hint_layer = text_layer_create(GRect(0, bounds.size.h - 50, bounds.size.w, 40));
+  text_layer_set_text(s_hint_layer, "Select: toggle    Back: exit");
+  text_layer_set_text_alignment(s_hint_layer, GTextAlignmentCenter);
+  text_layer_set_font(s_hint_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+  layer_add_child(window_layer, text_layer_get_layer(s_hint_layer));
+
+  DictionaryIterator *iter;
+  app_message_outbox_begin(&iter);
+  dict_write_cstring(iter, MESSAGE_KEY_PLAY_SOUND, "alarm_loop");
+  app_message_outbox_send();
+  s_is_playing = true;
+}
+
+static void prv_oneclick_unload(Window *window) {
+  if (s_is_playing) {
+    DictionaryIterator *iter;
+    app_message_outbox_begin(&iter);
+    dict_write_uint8(iter, MESSAGE_KEY_STOP_SOUND, 1);
+    app_message_outbox_send();
+    s_is_playing = false;
+  }
+  text_layer_destroy(s_hint_layer);
+  s_hint_layer = NULL;
+  text_layer_destroy(s_status_layer);
+  s_status_layer = NULL;
+}
+
+// --- Init / Deinit ---
+
 static void prv_init(void) {
   app_message_register_inbox_received(prv_inbox_received_handler);
   app_message_open(128, 128);
-  s_window = window_create();
-  window_set_window_handlers(s_window, (WindowHandlers) {
-    .load = prv_window_load,
-    .unload = prv_window_unload,
-  });
-  window_stack_push(s_window, true);
+
+  if (launch_reason() == APP_LAUNCH_QUICK_LAUNCH) {
+    s_oneclick_window = window_create();
+    window_set_window_handlers(s_oneclick_window, (WindowHandlers) {
+      .load = prv_oneclick_load,
+      .unload = prv_oneclick_unload,
+    });
+    window_set_click_config_provider(s_oneclick_window, prv_oneclick_click_config_provider);
+    window_stack_push(s_oneclick_window, true);
+  } else {
+    s_window = window_create();
+    window_set_window_handlers(s_window, (WindowHandlers) {
+      .load = prv_window_load,
+      .unload = prv_window_unload,
+    });
+    window_stack_push(s_window, true);
+  }
 }
 
 static void prv_deinit(void) {
-  window_destroy(s_window);
+  if (s_oneclick_window) {
+    window_destroy(s_oneclick_window);
+  }
+  if (s_window) {
+    window_destroy(s_window);
+  }
 }
 
 int main(void) {

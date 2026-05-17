@@ -6,7 +6,7 @@
   "private": true,
   "dependencies": {},
   "pebble": {
-    "displayName": "PlaySoundMobile",
+    "displayName": "Play Sound Mobile",
     "uuid": "91006f35-ed44-4318-adab-f459a0d81768",
     "sdkVersion": "3",
     "enableMultiJS": true,

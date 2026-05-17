@@ -49,6 +49,13 @@ pebble build --clean
 - **Alarm + Vol Max** — raises volume to max (with exact step calculation), then plays alarm
 - **Voice+Alarm+Max Lp** — raises volume to max, then alternates voice/alarm every 1.5s; select again to stop
 
+### One-Click Action (Quick Launch)
+- When launched via **Quick Launch** (`APP_LAUNCH_QUICK_LAUNCH`), the app bypasses the menu and enters one-click mode:
+  - **Auto-starts** `alarm_loop` and shows **"Playing..."**
+  - **Select** toggles start/stop (text switches between "Playing..."/"Stopped")
+  - **Back** stops the loop and exits the app
+- When launched normally, the full menu is shown (unchanged)
+
 ### Volume Section
 - **Vol Max** — sends 16 `music_volume_up()` calls via 100ms timers, calculating exact steps needed from current volume (`ceil((100 - current) * 4 / 25)`)
 - **Vol Down** — single `music_volume_down()`

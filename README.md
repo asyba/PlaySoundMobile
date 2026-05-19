@@ -32,3 +32,10 @@ pebble clean && pebble build --sdk tintin
 ```
 
 > **Target:** `flint` only. Uses the local SDK at `PebbleOS/build/sdk/flint`.
+
+## Screenshots
+
+![Menu](screenshot2.png)
+![Menu 2](screenshot3.png)
+![Menu 3](screenshot4.png)
+![Quick launch mode](screenshot1.png)

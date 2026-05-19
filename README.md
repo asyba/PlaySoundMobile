@@ -15,9 +15,20 @@ Select a sound type from the menu, and the C side tells PebbleKit JS to call `Pe
 
 ## Build
 
+Requires a custom PebbleOS SDK built from [PebbleOS](../PebbleOS/):
+
 ```sh
-pebble build
-pebble build --clean   # clean build
+# Build the SDK (once)
+cd ../PebbleOS
+pip install -r requirements.txt
+./waf configure --board asterix --internal_sdk_build
+./waf build
+./waf bundle
+
+# Build the app
+pebble sdk install --tintin /../PebbleOS
+pebble clean && pebble build --sdk tintin
+
 ```
 
-> **Note:** Built with a local SDK (`--internal_sdk_build`), target: `flint` only. The official Pebble SDK doesn't have the newer APIs (`music_get_volume_percent`, `Pebble.playSound()`, etc.).
+> **Target:** `flint` only. Uses the local SDK at `PebbleOS/build/sdk/flint`.

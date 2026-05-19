@@ -47,13 +47,20 @@ pebble build --clean
 - **SMS Loop** — loops SMS sound
 - **Stop All** — sends STOP_SOUND to JS
 - **Alarm + Vol Max** — raises volume to max (with exact step calculation), then plays alarm
-- **Voice+Alarm+Max Lp** — raises volume to max, then alternates voice/alarm every 1.5s; select again to stop
+- **Alt Loop Max** (subtitle: Vc+Alarm) — raises volume to max, then alternates voice/alarm every 1.5s; select again to stop
+- **Default Ringtone** — plays the phone's default ringtone (via `Pebble.playDefaultRingtone()`)
+- **Sound By ID 1004** — plays iOS system sound ID 1004 (mail sent) via `Pebble.playSoundById()`
+
+### Airplane Mode Detection
+- Uses `connection_service_peek_pebble_app_connection()` to check phone connectivity before playing sounds
+- **In quick launch mode**: if phone is not connected, shows **"Phone not connected"** instead of auto-playing; Back exits
+- **In menu mode**: selecting any sound action while phone is not connected pushes a warning window with "Phone not connected"; Back returns to menu
+- Stop actions (Stop All, re-selecting a loop) are still allowed
 
 ### One-Click Action (Quick Launch)
 - When launched via **Quick Launch** (`APP_LAUNCH_QUICK_LAUNCH`), the app bypasses the menu and enters one-click mode:
-  - **Auto-starts** `alarm_loop` and shows **"Playing..."**
-  - **Select** toggles start/stop (text switches between "Playing..."/"Stopped")
-  - **Back** stops the loop and exits the app
+  - If phone is connected: **auto-starts** `alarm_loop` and shows **"Playing..."**; **Select** toggles start/stop; **Back** stops the loop and exits
+  - If phone is not connected (airplane mode): shows **"Disable first airplane mode"**; Back exits
 - When launched normally, the full menu is shown (unchanged)
 
 ### Volume Section
@@ -66,8 +73,13 @@ pebble build --clean
 - `STOP_SOUND` — sent from C to JS to stop playback
 - `PLAY_ERROR` — sent from JS to C on failure
 - `PLAY_SUCCESS` — sent from JS to C on success
+- `PLAY_DEFAULT_RINGTONE` — sent from C to JS to play the phone's default ringtone
+- `PLAY_SOUND_BY_ID` — sent from C to JS with iOS system sound ID string
 
 Note: `VOLUME_SET_MAX` is **not used**. Volume max is done entirely on the C side via direct firmware calls (`music_volume_up()`, `music_get_volume_percent()`).
+
+## Reference
+- [Official Pebble SDK docs (LLMs.txt)](https://developer.repebble.com/llms.txt)
 
 ## Important Notes
 - This is a **watchface=false** app (interactive app)

@@ -21,7 +21,9 @@
       "STOP_SOUND",
       "PLAY_ERROR",
       "PLAY_SUCCESS",
-      "VOLUME_SET_MAX"
+      "VOLUME_SET_MAX",
+      "PLAY_DEFAULT_RINGTONE",
+      "PLAY_SOUND_BY_ID"
     ],
     "resources": {
       "media": []

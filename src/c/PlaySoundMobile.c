@@ -3,7 +3,7 @@
 static Window *s_window;
 static SimpleMenuLayer *s_simple_menu_layer;
 static SimpleMenuSection s_menu_sections[2];
-static SimpleMenuItem s_sound_items[9];
+static SimpleMenuItem s_sound_items[11];
 static SimpleMenuItem s_volume_items[3];
 static char s_volume_subtitle[16];
 static int s_last_index = -1;
@@ -82,6 +82,47 @@ static void set_volume_max_with_callback(void (*cb)(void)) {
   s_volume_timer = app_timer_register(100, volume_up_timer_callback, NULL);
 }
 
+// --- Airplane mode check ---
+
+static bool prv_is_airplane_mode(void) {
+  return !connection_service_peek_pebble_app_connection();
+}
+
+static void prv_airplane_back_click(ClickRecognizerRef recognizer, void *context) {
+  window_stack_pop(true);
+}
+
+static void prv_airplane_click_config_provider(void *context) {
+  window_single_click_subscribe(BUTTON_ID_BACK, prv_airplane_back_click);
+}
+
+static void prv_airplane_window_load(Window *window) {
+  Layer *window_layer = window_get_root_layer(window);
+  GRect bounds = layer_get_bounds(window_layer);
+
+  TextLayer *text = text_layer_create(GRect(0, bounds.size.h / 2 - 30, bounds.size.w, 60));
+  text_layer_set_text(text, "Phone not\nconnected");
+  text_layer_set_text_alignment(text, GTextAlignmentCenter);
+  text_layer_set_font(text, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
+  layer_add_child(window_layer, text_layer_get_layer(text));
+
+  window_set_user_data(window, text);
+}
+
+static void prv_airplane_window_unload(Window *window) {
+  text_layer_destroy(window_get_user_data(window));
+}
+
+static void prv_show_airplane_warning(void) {
+  Window *w = window_create();
+  window_set_window_handlers(w, (WindowHandlers) {
+    .load = prv_airplane_window_load,
+    .unload = prv_airplane_window_unload,
+  });
+  window_set_click_config_provider(w, prv_airplane_click_config_provider);
+  window_stack_push(w, true);
+}
+
 static void play_alarm(void) {
   DictionaryIterator *iter;
   app_message_outbox_begin(&iter);
@@ -90,6 +131,10 @@ static void play_alarm(void) {
 }
 
 static void alarm_maxvol_callback(int index, void *ctx) {
+  if (prv_is_airplane_mode()) {
+    prv_show_airplane_warning();
+    return;
+  }
   set_volume_max_with_callback(play_alarm);
 }
 
@@ -126,6 +171,10 @@ static void voice_alarm_maxvol_callback(int index, void *ctx) {
     s_last_index = -1;
     return;
   }
+  if (prv_is_airplane_mode()) {
+    prv_show_airplane_warning();
+    return;
+  }
   stop_alt_loop();
   s_last_index = index;
   set_volume_max_with_callback(start_alt_loop);
@@ -146,6 +195,11 @@ static void sound_menu_select_callback(int index, void *ctx) {
     return;
   }
 
+  if (index != 6 && prv_is_airplane_mode()) {
+    prv_show_airplane_warning();
+    return;
+  }
+
   char type[20];
   switch (index) {
     case 0: snprintf(type, sizeof(type), "voice"); break;
@@ -160,6 +214,22 @@ static void sound_menu_select_callback(int index, void *ctx) {
         dict_write_uint8(iter, MESSAGE_KEY_STOP_SOUND, 1);
         app_message_outbox_send();
         s_last_index = -1;
+        return;
+      }
+    case 9: {
+        DictionaryIterator *iter;
+        app_message_outbox_begin(&iter);
+        dict_write_uint8(iter, MESSAGE_KEY_PLAY_DEFAULT_RINGTONE, 1);
+        app_message_outbox_send();
+        s_last_index = index;
+        return;
+      }
+    case 10: {
+        DictionaryIterator *iter;
+        app_message_outbox_begin(&iter);
+        dict_write_cstring(iter, MESSAGE_KEY_PLAY_SOUND_BY_ID, "1004");
+        app_message_outbox_send();
+        s_last_index = index;
         return;
       }
     default: snprintf(type, sizeof(type), "voice"); break;
@@ -178,10 +248,18 @@ static void sound_menu_select_callback(int index, void *ctx) {
 
 static void volume_menu_select_callback(int index, void *ctx) {
   if (index == 0) {
+    if (prv_is_airplane_mode()) {
+      prv_show_airplane_warning();
+      return;
+    }
     // Vol Max: use firmware music_volume_up() directly
     APP_LOG(APP_LOG_LEVEL_DEBUG, "Setting volume to max via firmware");
     set_volume_max();
   } else if (index == 1) {
+    if (prv_is_airplane_mode()) {
+      prv_show_airplane_warning();
+      return;
+    }
     // Vol Down once
     music_volume_down();
   } else if (index == 2) {
@@ -223,11 +301,13 @@ static void prv_window_load(Window *window) {
   s_sound_items[5] = (SimpleMenuItem) { .title = "SMS Loop", .callback = sound_menu_select_callback };
   s_sound_items[6] = (SimpleMenuItem) { .title = "Stop All", .callback = sound_menu_select_callback };
   s_sound_items[7] = (SimpleMenuItem) { .title = "Alarm + Vol Max", .callback = alarm_maxvol_callback };
-  s_sound_items[8] = (SimpleMenuItem) { .title = "Voice+Alarm+Max Lp", .callback = voice_alarm_maxvol_callback };
+  s_sound_items[8] = (SimpleMenuItem) { .title = "Alt Loop Max", .subtitle = "Vc+Alarm", .callback = voice_alarm_maxvol_callback };
+  s_sound_items[9] = (SimpleMenuItem) { .title = "Default Ringtone", .callback = sound_menu_select_callback };
+  s_sound_items[10] = (SimpleMenuItem) { .title = "Sound By ID 1004", .callback = sound_menu_select_callback };
 
   s_menu_sections[0] = (SimpleMenuSection) {
     .title = "Sound",
-    .num_items = 9,
+    .num_items = 11,
     .items = s_sound_items,
   };
 
@@ -266,6 +346,10 @@ static void prv_oneclick_select_click(ClickRecognizerRef recognizer, void *conte
     text_layer_set_text(s_status_layer, "Stopped");
     s_is_playing = false;
   } else {
+    if (prv_is_airplane_mode()) {
+      prv_show_airplane_warning();
+      return;
+    }
     DictionaryIterator *iter;
     app_message_outbox_begin(&iter);
     dict_write_cstring(iter, MESSAGE_KEY_PLAY_SOUND, "alarm_loop");
@@ -294,17 +378,27 @@ static void prv_oneclick_load(Window *window) {
   text_layer_set_font(s_status_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
   layer_add_child(window_layer, text_layer_get_layer(s_status_layer));
 
-  s_hint_layer = text_layer_create(GRect(0, bounds.size.h - 50, bounds.size.w, 40));
-  text_layer_set_text(s_hint_layer, "Select: toggle    Back: exit");
-  text_layer_set_text_alignment(s_hint_layer, GTextAlignmentCenter);
-  text_layer_set_font(s_hint_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
-  layer_add_child(window_layer, text_layer_get_layer(s_hint_layer));
+  if (prv_is_airplane_mode()) {
+    text_layer_set_text(s_status_layer, "Phone not\nconnected");
+    s_hint_layer = text_layer_create(GRect(0, bounds.size.h - 50, bounds.size.w, 40));
+    text_layer_set_text(s_hint_layer, "Back: exit");
+    text_layer_set_text_alignment(s_hint_layer, GTextAlignmentCenter);
+    text_layer_set_font(s_hint_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+    layer_add_child(window_layer, text_layer_get_layer(s_hint_layer));
+    s_is_playing = false;
+  } else {
+    s_hint_layer = text_layer_create(GRect(0, bounds.size.h - 50, bounds.size.w, 40));
+    text_layer_set_text(s_hint_layer, "Select: toggle - Back: exit");
+    text_layer_set_text_alignment(s_hint_layer, GTextAlignmentCenter);
+    text_layer_set_font(s_hint_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+    layer_add_child(window_layer, text_layer_get_layer(s_hint_layer));
 
-  DictionaryIterator *iter;
-  app_message_outbox_begin(&iter);
-  dict_write_cstring(iter, MESSAGE_KEY_PLAY_SOUND, "alarm_loop");
-  app_message_outbox_send();
-  s_is_playing = true;
+    DictionaryIterator *iter;
+    app_message_outbox_begin(&iter);
+    dict_write_cstring(iter, MESSAGE_KEY_PLAY_SOUND, "alarm_loop");
+    app_message_outbox_send();
+    s_is_playing = true;
+  }
 }
 
 static void prv_oneclick_unload(Window *window) {
